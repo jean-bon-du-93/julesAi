@@ -63,22 +63,42 @@ public class Game {
         return head.x < 0 || head.x >= GRID_WIDTH || head.y < 0 || head.y >= GRID_HEIGHT;
     }
 
+    /**
+     * Gets the snake.
+     * @return the snake
+     */
     public Snake getSnake() {
         return snake;
     }
 
+    /**
+     * Gets the food.
+     * @return the food
+     */
     public Food getFood() {
         return food;
     }
 
+    /**
+     * Gets the current score.
+     * @return the score
+     */
     public int getScore() {
         return score;
     }
 
+    /**
+     * Checks if the game is over.
+     * @return true if the game is over, false otherwise
+     */
     public boolean isGameOver() {
         return gameOver;
     }
 
+    /**
+     * Sets the direction of the snake.
+     * @param direction the new direction
+     */
     public void setDirection(Direction direction) {
         snake.setDirection(direction);
     }

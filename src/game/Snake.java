@@ -54,18 +54,34 @@ public class Snake {
         return false;
     }
 
+    /**
+     * Gets the head of the snake.
+     * @return the head of the snake
+     */
     public Point getHead() {
         return body.getFirst();
     }
 
+    /**
+     * Gets the body of the snake.
+     * @return the body of the snake
+     */
     public List<Point> getBody() {
         return body;
     }
 
+    /**
+     * Gets the current direction of the snake.
+     * @return the direction
+     */
     public Direction getDirection() {
         return direction;
     }
 
+    /**
+     * Sets the direction of the snake.
+     * @param direction the new direction
+     */
     public void setDirection(Direction direction) {
         // Prevent the snake from reversing
         if (this.direction == Direction.UP && direction == Direction.DOWN) return;

@@ -26,6 +26,9 @@ public class GameController {
         gameFrame.switchPanel(menuPanel);
     }
 
+    /**
+     * Starts the human player mode.
+     */
     public void startHumanMode() {
         game = new Game();
         gamePanel = new GamePanel(game);
@@ -41,6 +44,9 @@ public class GameController {
         startGameLoop();
     }
 
+    /**
+     * Starts the AI training mode.
+     */
     public void startAiTrainingMode() {
         new Thread(() -> {
             System.out.println("AI Training Mode started. This may take a while...");
@@ -51,6 +57,9 @@ public class GameController {
         }).start();
     }
 
+    /**
+     * Shows the training chart.
+     */
     public void showTrainingChart() {
         if (lastTrainingStats == null || lastTrainingStats.getScores().isEmpty()) {
             JOptionPane.showMessageDialog(gameFrame, "No training data available. Please run the AI training first.", "Info", JOptionPane.INFORMATION_MESSAGE);
@@ -64,6 +73,9 @@ public class GameController {
         chartFrame.setVisible(true);
     }
 
+    /**
+     * Starts the AI autonomous mode.
+     */
     public void startAiAutonomousMode() {
         game = new Game();
         gamePanel = new GamePanel(game);
