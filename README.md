@@ -20,36 +20,38 @@ This project is a complete Snake game in Java with an AI component that learns t
 - `saves/`: Directory for saved AI models.
 - `test/`: Unit tests for the project.
 
-## Compilation and Execution
+## Building and Running the Project
+
+This project uses Apache Ant for building.
 
 ### Dependencies
 
-This project requires the following libraries:
+The required libraries (JFreeChart, JUnit) should be placed in a `lib` directory at the root of the project.
 
-- **JFreeChart**: For generating the statistics chart.
-- **JUnit 5**: For running the unit tests.
+1.  **JFreeChart**: Download from the [official website](https://www.jfree.org/jfreechart/). You will need `jfreechart-1.5.3.jar` and `jcommon-1.0.23.jar`.
+2.  **JUnit 5**: Download `junit-platform-console-standalone-1.8.2.jar` from the [JUnit website](https://junit.org/junit5/).
 
-You will need to download the JAR files for these libraries and include them in your classpath.
+### Building with Ant
 
-1.  **JFreeChart**: Download from the [official website](https://www.jfree.org/jfreechart/) or a Maven repository. You will need `jfreechart-x.x.x.jar` and `jcommon-x.x.x.jar`.
-2.  **JUnit 5**: Download `junit-platform-console-standalone-x.x.x.jar` from the [JUnit website](https://junit.org/junit5/).
+Once you have Ant installed and the dependencies in the `lib` folder, you can use the following commands from the root of the project:
 
-### Compilation
-
-1.  Place the downloaded JAR files in a `lib` directory at the root of the project.
-
-2.  Compile the source code from the root directory of the project:
-
-    ```bash
-    javac -d out -cp "lib/*:src" $(find src -name "*.java")
-    ```
+- **`ant`** or **`ant dist`**: Compiles the project and creates an executable JAR file in the `dist` directory.
+- **`ant clean`**: Deletes the `build` and `dist` directories.
 
 ### Execution
 
-1.  Run the main application:
+There are two ways to run the application:
+
+1.  **With GUI**:
 
     ```bash
     java -cp "lib/*:out" Main
+    ```
+
+2.  **Headless Training**: To run the training process without the GUI for maximum speed:
+
+    ```bash
+    java -cp "lib/*:out" ai.HeadlessTrainer
     ```
 
 ### Running Tests

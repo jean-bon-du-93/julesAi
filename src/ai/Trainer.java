@@ -31,7 +31,7 @@ public class Trainer {
             System.out.println("Created new Q-table.");
         }
 
-        Agent agent = new Agent(qTable, 0.1, 0.9, 0.1);
+        Agent agent = new Agent(qTable, 0.01, 0.95, 1.0, 0.01, 0.995);
         Game game = new Game();
 
         for (int episode = 0; episode < NUM_EPISODES; episode++) {
@@ -40,17 +40,20 @@ public class Trainer {
             int steps = 0;
 
             while (!game.isGameOver() && steps < 1000) { // Limit steps to prevent infinite loops
+                Point oldHead = game.getSnake().getHead();
+                Point food = game.getFood().getPosition();
                 int action = agent.chooseAction(state);
                 game.setDirection(Agent.getDirectionFromAction(action));
                 game.update();
 
-                double reward = calculateReward(game);
+                double reward = calculateReward(game, oldHead, food);
                 String nextState = agent.getState(game);
                 agent.learn(state, action, reward, nextState);
                 state = nextState;
                 steps++;
             }
 
+            agent.decayExplorationRate();
             stats.addScore(game.getScore());
 
             if ((episode + 1) % 100 == 0) {
@@ -70,13 +73,21 @@ public class Trainer {
         return stats;
     }
 
-    private double calculateReward(Game game) {
+    private double calculateReward(Game game, Point oldHead, Point food) {
         if (game.isGameOver()) {
             return -100.0; // Penalty for dying
         }
-        if (game.getSnake().getHead().equals(game.getFood().getPosition())) {
-            return 10.0; // Reward for eating food
+        if (game.getSnake().getHead().equals(food)) {
+            return 50.0; // Big reward for eating food
         }
-        return -0.1; // Small penalty for each step to encourage speed
+
+        double oldDist = Math.hypot(oldHead.x - food.x, oldHead.y - food.y);
+        double newDist = Math.hypot(game.getSnake().getHead().x - food.x, game.getSnake().getHead().y - food.y);
+
+        if (newDist < oldDist) {
+            return 1.0; // Reward for getting closer
+        } else {
+            return -1.5; // Penalty for moving away
+        }
     }
 }

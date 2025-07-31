@@ -13,7 +13,9 @@ public class Agent {
     private final QTable qTable;
     private final double learningRate;
     private final double discountFactor;
-    private final double explorationRate;
+    private double explorationRate;
+    private final double minExplorationRate;
+    private final double explorationDecayRate;
     private final Random random = new Random();
 
     /**
@@ -21,13 +23,17 @@ public class Agent {
      * @param qTable the Q-table
      * @param learningRate the learning rate
      * @param discountFactor the discount factor
-     * @param explorationRate the exploration rate
+     * @param explorationRate the initial exploration rate
+     * @param minExplorationRate the minimum exploration rate
+     * @param explorationDecayRate the exploration decay rate
      */
-    public Agent(QTable qTable, double learningRate, double discountFactor, double explorationRate) {
+    public Agent(QTable qTable, double learningRate, double discountFactor, double explorationRate, double minExplorationRate, double explorationDecayRate) {
         this.qTable = qTable;
         this.learningRate = learningRate;
         this.discountFactor = discountFactor;
         this.explorationRate = explorationRate;
+        this.minExplorationRate = minExplorationRate;
+        this.explorationDecayRate = explorationDecayRate;
     }
 
     /**
@@ -39,21 +45,43 @@ public class Agent {
         Point head = game.getSnake().getHead();
         Point food = game.getFood().getPosition();
 
-        // Food direction
+        // Directions: N, NE, E, SE, S, SW, W, NW
+        Point[] directions = {
+            new Point(0, -1), new Point(1, -1), new Point(1, 0), new Point(1, 1),
+            new Point(0, 1), new Point(-1, 1), new Point(-1, 0), new Point(-1, -1)
+        };
+
+        StringBuilder stateBuilder = new StringBuilder();
+
+        for (Point dir : directions) {
+            double distanceToWall = 0;
+            double distanceToBody = 0;
+            boolean foodInDirection = false;
+
+            Point current = new Point(head.x + dir.x, head.y + dir.y);
+            double distance = 1.0;
+
+            while (current.x >= 0 && current.x < Game.GRID_WIDTH && current.y >= 0 && current.y < Game.GRID_HEIGHT) {
+                if (game.getSnake().getBody().contains(current) && distanceToBody == 0) {
+                    distanceToBody = 1.0 / distance;
+                }
+                if (current.equals(food)) {
+                    foodInDirection = true;
+                }
+                current = new Point(current.x + dir.x, current.y + dir.y);
+                distance++;
+            }
+            distanceToWall = 1.0 / distance;
+
+            stateBuilder.append(String.format("%.2f,%.2f,%d,", distanceToWall, distanceToBody, foodInDirection ? 1 : 0));
+        }
+
+        // Food direction relative to head
         int foodDx = Integer.compare(food.x, head.x);
         int foodDy = Integer.compare(food.y, head.y);
+        stateBuilder.append(foodDx).append(",").append(foodDy);
 
-        // Obstacle detection
-        boolean dangerUp = isObstacle(game, new Point(head.x, head.y - 1));
-        boolean dangerDown = isObstacle(game, new Point(head.x, head.y + 1));
-        boolean dangerLeft = isObstacle(game, new Point(head.x - 1, head.y));
-        boolean dangerRight = isObstacle(game, new Point(head.x + 1, head.y));
-
-        return foodDx + "," + foodDy + "," + dangerUp + "," + dangerDown + "," + dangerLeft + "," + dangerRight;
-    }
-
-    private boolean isObstacle(Game game, Point p) {
-        return p.x < 0 || p.x >= Game.GRID_WIDTH || p.y < 0 || p.y >= Game.GRID_HEIGHT || game.getSnake().getBody().contains(p);
+        return stateBuilder.toString();
     }
 
     /**
@@ -81,6 +109,13 @@ public class Agent {
         double nextMaxQ = qTable.get(nextState)[qTable.getBestAction(nextState)];
         double newQValue = oldQValue + learningRate * (reward + discountFactor * nextMaxQ - oldQValue);
         qTable.update(state, action, newQValue);
+    }
+
+    /**
+     * Decays the exploration rate.
+     */
+    public void decayExplorationRate() {
+        explorationRate = Math.max(minExplorationRate, explorationRate * explorationDecayRate);
     }
 
     /**
