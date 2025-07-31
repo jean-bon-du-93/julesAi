@@ -9,9 +9,16 @@ import java.io.IOException;
 /**
  * Manages the training process of the AI agent.
  */
+import org.deeplearning4j.nn.multilayer.MultiLayerNetwork;
+import org.nd4j.linalg.api.ndarray.INDArray;
+import org.nd4j.linalg.factory.Nd4j;
+import java.util.List;
+
 public class Trainer {
-    private static final int NUM_EPISODES = 10000;
-    private static final String Q_TABLE_FILE = "saves/q_table.ser";
+    private static final int NUM_EPISODES = 20000;
+    private static final int REPLAY_MEMORY_CAPACITY = 10000;
+    private static final int BATCH_SIZE = 128;
+    private static final String DQN_FILE = "saves/dqn.zip";
     private final Stats stats = new Stats();
 
     /**
@@ -22,34 +29,37 @@ public class Trainer {
         new File("saves").mkdirs();
         stats.clear();
 
-        QTable qTable;
+        MultiLayerNetwork dqn;
         try {
-            qTable = QTable.load(Q_TABLE_FILE);
-            System.out.println("Loaded existing Q-table.");
-        } catch (IOException | ClassNotFoundException e) {
-            qTable = new QTable();
-            System.out.println("Created new Q-table.");
+            dqn = MultiLayerNetwork.load(new File(DQN_FILE), true);
+            System.out.println("Loaded existing DQN model.");
+        } catch (IOException e) {
+            dqn = DQN.createDQN();
+            System.out.println("Created new DQN model.");
         }
 
-        Agent agent = new Agent(qTable, 0.01, 0.95, 1.0, 0.01, 0.995);
+        ReplayMemory replayMemory = new ReplayMemory(REPLAY_MEMORY_CAPACITY);
+        Agent agent = new Agent(dqn, replayMemory, 0.95, 1.0, 0.01, 0.995);
         Game game = new Game();
 
         for (int episode = 0; episode < NUM_EPISODES; episode++) {
             game.initGame();
-            String state = agent.getState(game);
+            INDArray state = agent.getState(game);
             int steps = 0;
 
             while (!game.isGameOver() && steps < 1000) { // Limit steps to prevent infinite loops
-                Point oldHead = game.getSnake().getHead();
-                Point food = game.getFood().getPosition();
                 int action = agent.chooseAction(state);
                 game.setDirection(Agent.getDirectionFromAction(action));
                 game.update();
 
-                double reward = calculateReward(game, oldHead, food);
-                String nextState = agent.getState(game);
-                agent.learn(state, action, reward, nextState);
+                INDArray nextState = agent.getState(game);
+                double reward = calculateReward(game, state, nextState);
+                replayMemory.add(new ReplayMemory.Experience(state, action, reward, nextState, game.isGameOver()));
                 state = nextState;
+
+                if (replayMemory.size() > BATCH_SIZE) {
+                    train(dqn, replayMemory, agent.getDiscountFactor());
+                }
                 steps++;
             }
 
@@ -57,13 +67,13 @@ public class Trainer {
             stats.addScore(game.getScore());
 
             if ((episode + 1) % 100 == 0) {
-                System.out.printf("Episode: %d, Average Score: %.2f%n", episode + 1, stats.getAverageScore());
+                System.out.printf("Episode: %d, Score: %d, Avg Score: %.2f%n", episode + 1, game.getScore(), stats.getAverageScore(100));
             }
 
             if ((episode + 1) % (NUM_EPISODES / 10) == 0) {
                 try {
-                    qTable.save(Q_TABLE_FILE);
-                    System.out.println("Saved Q-table at episode " + (episode + 1));
+                    dqn.save(new File(DQN_FILE), true);
+                    System.out.println("Saved DQN model at episode " + (episode + 1));
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
@@ -73,21 +83,35 @@ public class Trainer {
         return stats;
     }
 
-    private double calculateReward(Game game, Point oldHead, Point food) {
+    private void train(MultiLayerNetwork dqn, ReplayMemory replayMemory, double discountFactor) {
+        List<ReplayMemory.Experience> batch = replayMemory.sample(BATCH_SIZE);
+
+        INDArray states = Nd4j.vstack(batch.stream().map(ReplayMemory.Experience::state).toList());
+        INDArray nextStates = Nd4j.vstack(batch.stream().map(ReplayMemory.Experience::nextState).toList());
+
+        INDArray qValues = dqn.output(states);
+        INDArray nextQValues = dqn.output(nextStates);
+
+        for (int i = 0; i < batch.size(); i++) {
+            ReplayMemory.Experience exp = batch.get(i);
+            double targetQ;
+            if (exp.done()) {
+                targetQ = exp.reward();
+            } else {
+                targetQ = exp.reward() + discountFactor * Nd4j.max(nextQValues.getRow(i)).getDouble(0);
+            }
+            qValues.putScalar(i, exp.action(), targetQ);
+        }
+        dqn.fit(states, qValues);
+    }
+
+    private double calculateReward(Game game, INDArray state, INDArray nextState) {
         if (game.isGameOver()) {
-            return -100.0; // Penalty for dying
+            return -10.0; // Penalty for dying
         }
-        if (game.getSnake().getHead().equals(food)) {
-            return 50.0; // Big reward for eating food
+        if (game.getScore() > 0) {
+            return (double) game.getScore(); // Reward for eating food
         }
-
-        double oldDist = Math.hypot(oldHead.x - food.x, oldHead.y - food.y);
-        double newDist = Math.hypot(game.getSnake().getHead().x - food.x, game.getSnake().getHead().y - food.y);
-
-        if (newDist < oldDist) {
-            return 1.0; // Reward for getting closer
-        } else {
-            return -1.5; // Penalty for moving away
-        }
+        return -0.1; // Small penalty for each step
     }
 }

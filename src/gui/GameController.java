@@ -83,15 +83,15 @@ public class GameController {
 
         new Thread(() -> {
             try {
-                ai.QTable qTable = ai.QTable.load("saves/q_table.ser");
-                ai.Agent agent = new ai.Agent(qTable, 0, 1, 0); // No learning, no exploration
+                org.deeplearning4j.nn.multilayer.MultiLayerNetwork dqn = org.deeplearning4j.nn.multilayer.MultiLayerNetwork.load(new java.io.File("saves/dqn.zip"), true);
+                ai.Agent agent = new ai.Agent(dqn, null, 0, 0, 0, 0); // No replay memory or exploration needed for autonomous mode
 
                 while (!Thread.currentThread().isInterrupted()) {
                     if (game.isGameOver()) {
                         game.restart();
                     }
 
-                    String state = agent.getState(game);
+                    org.nd4j.linalg.api.ndarray.INDArray state = agent.getState(game);
                     int action = agent.chooseAction(state);
                     game.setDirection(ai.Agent.getDirectionFromAction(action));
                     game.update();
@@ -103,7 +103,7 @@ public class GameController {
                         Thread.currentThread().interrupt();
                     }
                 }
-            } catch (IOException | ClassNotFoundException e) {
+            } catch (IOException e) {
                 e.printStackTrace();
                 JOptionPane.showMessageDialog(gameFrame, "Could not load AI model. Please train the AI first.", "Error", JOptionPane.ERROR_MESSAGE);
             }

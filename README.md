@@ -26,10 +26,15 @@ This project uses Apache Ant for building.
 
 ### Dependencies
 
-The required libraries (JFreeChart, JUnit) should be placed in a `lib` directory at the root of the project.
+This project requires the following libraries, which should be placed in a `lib` directory at the root of the project:
 
-1.  **JFreeChart**: Download from the [official website](https://www.jfree.org/jfreechart/). You will need `jfreechart-1.5.3.jar` and `jcommon-1.0.23.jar`.
-2.  **JUnit 5**: Download `junit-platform-console-standalone-1.8.2.jar` from the [JUnit website](https://junit.org/junit5/).
+- **JFreeChart**: For charting (`jfreechart-1.5.3.jar`, `jcommon-1.0.23.jar`).
+- **JUnit 5**: For testing (`junit-platform-console-standalone-1.8.2.jar`).
+- **Deeplearning4j**: For the DQN. You will need the DL4J binaries for your platform. A convenient way to get all the necessary JARs is to use Maven to download them. The key dependencies are:
+  - `deeplearning4j-core`
+  - `nd4j-native-platform` (or another backend suitable for your system)
+  - `datavec-api`
+  - `slf4j-simple` (for logging)
 
 ### Building with Ant
 

@@ -36,8 +36,9 @@
         <jar jarfile="${dist}/SnakeAI.jar" basedir="${build}">
             <manifest>
                 <attribute name="Main-Class" value="Main"/>
-                <attribute name="Class-Path" value="lib/jfreechart-1.5.3.jar lib/jcommon-1.0.23.jar"/>
+                <attribute name="Class-Path" value="${dist}/lib"/>
             </manifest>
+            <zipgroupfileset dir="${lib}" includes="**/*.jar"/>
         </jar>
     </target>
 
