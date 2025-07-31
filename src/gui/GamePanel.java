@@ -2,6 +2,7 @@ package gui;
 
 import game.Game;
 import game.Point;
+import utils.Config;
 
 import javax.swing.*;
 import java.awt.*;
@@ -17,8 +18,6 @@ public class GamePanel extends JPanel {
      * Constructs a new GamePanel.
      * @param game the game instance
      */
-import utils.Config;
-
     public GamePanel(Game game) {
         this.game = game;
         setPreferredSize(new Dimension(Config.GRID_WIDTH * CELL_SIZE, Config.GRID_HEIGHT * CELL_SIZE));

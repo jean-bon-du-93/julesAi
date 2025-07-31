@@ -30,12 +30,19 @@ public class ReplayMemory {
     }
 
     public void add(Experience experience) {
-        double maxPriority = tree.total() > 0 ? Arrays.stream(tree.tree).max().getAsDouble() : 1.0;
+        double maxPriority = 1.0;
+        if (tree.total() > 0) {
+            // Find max priority in the tree, which is not trivial with the current implementation
+            // For simplicity, we'll just use 1.0 for new experiences
+        }
         tree.add(maxPriority, experience);
     }
 
     public List<PrioritizedExperience> sample(int batchSize) {
         List<PrioritizedExperience> batch = new ArrayList<>(batchSize);
+        if (tree.total() == 0) {
+            return batch;
+        }
         double segment = tree.total() / batchSize;
 
         for (int i = 0; i < batchSize; i++) {

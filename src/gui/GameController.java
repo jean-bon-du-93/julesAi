@@ -3,6 +3,7 @@ package gui;
 import game.Direction;
 import game.Game;
 
+import javax.swing.*;
 import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
 
@@ -17,12 +18,11 @@ public class GameController {
     private Thread gameThread;
     private utils.Stats lastTrainingStats;
     private java.util.List<Double> lastTrainingLosses;
+    private final OptionsPanel optionsPanel;
 
     /**
      * Constructs a new GameController.
      */
-    private final OptionsPanel optionsPanel;
-
     public GameController() {
         gameFrame = new GameFrame();
         menuPanel = new MenuPanel(this);
@@ -126,7 +126,7 @@ public class GameController {
                 }
             } catch (IOException e) {
                 e.printStackTrace();
-                JOptionPane.showMessageDialog(gameFrame, "Could not load AI model. Please train the AI first.", "Error", JOptionPane.ERROR_MESSAGE);
+                SwingUtilities.invokeLater(() -> JOptionPane.showMessageDialog(gameFrame, "Could not load AI model. Please train the AI first.", "Error", JOptionPane.ERROR_MESSAGE));
             }
         }).start();
     }
