@@ -21,11 +21,13 @@ public class Trainer {
     private static final int NUM_EPISODES = 20000;
     private static final int REPLAY_MEMORY_CAPACITY = 10000;
     private static final int BATCH_SIZE = 128;
+    private static final int TARGET_NETWORK_UPDATE_FREQUENCY = 100; // in episodes
     private static final String DQN_FILE = "saves/dqn_latest.zip";
     private static final String BEST_DQN_FILE = "saves/dqn_best.zip";
     private final Stats stats = new Stats();
     private final List<Double> lossHistory = new ArrayList<>();
     private int bestScore = 0;
+    private MultiLayerNetwork targetDqn;
 
     /**
      * Starts the training process.
@@ -49,6 +51,7 @@ public class Trainer {
             dqn = DQN.createDQN();
             System.out.println("Created new DQN model.");
         }
+        targetDqn = dqn.clone();
         dqn.setListeners(new ScoreIterationListener(1000));
 
         ReplayMemory replayMemory = new ReplayMemory(REPLAY_MEMORY_CAPACITY);
@@ -101,6 +104,11 @@ public class Trainer {
                     e.printStackTrace();
                 }
             }
+
+            if ((episode + 1) % TARGET_NETWORK_UPDATE_FREQUENCY == 0) {
+                targetDqn.setParams(dqn.params());
+                System.out.println("Updated target network at episode " + (episode + 1));
+            }
         }
         System.out.println("Training finished.");
         return stats;
@@ -113,7 +121,8 @@ public class Trainer {
         INDArray nextStates = Nd4j.vstack(batch.stream().map(ReplayMemory.Experience::nextState).toList());
 
         INDArray qValues = dqn.output(states);
-        INDArray nextQValues = dqn.output(nextStates);
+        INDArray nextQValuesFromMainDQN = dqn.output(nextStates);
+        INDArray nextQValuesFromTargetDQN = targetDqn.output(nextStates);
 
         for (int i = 0; i < batch.size(); i++) {
             ReplayMemory.Experience exp = batch.get(i);
@@ -121,7 +130,8 @@ public class Trainer {
             if (exp.done()) {
                 targetQ = exp.reward();
             } else {
-                targetQ = exp.reward() + discountFactor * Nd4j.max(nextQValues.getRow(i)).getDouble(0);
+                int bestAction = Nd4j.argMax(nextQValuesFromMainDQN.getRow(i)).getInt(0);
+                targetQ = exp.reward() + discountFactor * nextQValuesFromTargetDQN.getDouble(i, bestAction);
             }
             qValues.putScalar(i, exp.action(), targetQ);
         }
