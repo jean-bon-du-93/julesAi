@@ -9,51 +9,85 @@ import java.util.Random;
 /**
  * The AI agent that learns to play Snake.
  */
+import org.deeplearning4j.nn.multilayer.MultiLayerNetwork;
+import org.nd4j.linalg.api.ndarray.INDArray;
+import org.nd4j.linalg.factory.Nd4j;
+
 public class Agent {
-    private final QTable qTable;
-    private final double learningRate;
+    private final MultiLayerNetwork dqn;
+    private final ReplayMemory replayMemory;
     private final double discountFactor;
-    private final double explorationRate;
+    private double explorationRate;
+    private final double minExplorationRate;
+    private final double explorationDecayRate;
     private final Random random = new Random();
 
     /**
      * Constructs a new Agent.
-     * @param qTable the Q-table
-     * @param learningRate the learning rate
+     * @param dqn the DQN
+     * @param replayMemory the replay memory
      * @param discountFactor the discount factor
-     * @param explorationRate the exploration rate
+     * @param explorationRate the initial exploration rate
+     * @param minExplorationRate the minimum exploration rate
+     * @param explorationDecayRate the exploration decay rate
      */
-    public Agent(QTable qTable, double learningRate, double discountFactor, double explorationRate) {
-        this.qTable = qTable;
-        this.learningRate = learningRate;
+    public Agent(MultiLayerNetwork dqn, ReplayMemory replayMemory, double discountFactor, double explorationRate, double minExplorationRate, double explorationDecayRate) {
+        this.dqn = dqn;
+        this.replayMemory = replayMemory;
         this.discountFactor = discountFactor;
         this.explorationRate = explorationRate;
+        this.minExplorationRate = minExplorationRate;
+        this.explorationDecayRate = explorationDecayRate;
     }
 
     /**
-     * Gets the current state of the game.
+     * Gets the current state of the game as an INDArray.
      * @param game the game instance
-     * @return the state as a string
+     * @return the state as an INDArray
      */
-    public String getState(Game game) {
+    public INDArray getState(Game game) {
         Point head = game.getSnake().getHead();
         Point food = game.getFood().getPosition();
 
-        // Food direction
-        int foodDx = Integer.compare(food.x, head.x);
-        int foodDy = Integer.compare(food.y, head.y);
+        // Directions: N, NE, E, SE, S, SW, W, NW
+        Point[] directions = {
+            new Point(0, -1), new Point(1, -1), new Point(1, 0), new Point(1, 1),
+            new Point(0, 1), new Point(-1, 1), new Point(-1, 0), new Point(-1, -1)
+        };
 
-        // Obstacle detection
-        boolean dangerUp = isObstacle(game, new Point(head.x, head.y - 1));
-        boolean dangerDown = isObstacle(game, new Point(head.x, head.y + 1));
-        boolean dangerLeft = isObstacle(game, new Point(head.x - 1, head.y));
-        boolean dangerRight = isObstacle(game, new Point(head.x + 1, head.y));
+        float[] state = new float[26];
+        int i = 0;
 
-        return foodDx + "," + foodDy + "," + dangerUp + "," + dangerDown + "," + dangerLeft + "," + dangerRight;
-    }
+        for (Point dir : directions) {
+            float distanceToWall = 0;
+            float distanceToBody = 0;
+            float foodInDirection = 0;
 
-    private boolean isObstacle(Game game, Point p) {
-        return p.x < 0 || p.x >= Game.GRID_WIDTH || p.y < 0 || p.y >= Game.GRID_HEIGHT || game.getSnake().getBody().contains(p);
+            Point current = new Point(head.x + dir.x, head.y + dir.y);
+            float distance = 1.0f;
+
+            while (current.x >= 0 && current.x < Game.GRID_WIDTH && current.y >= 0 && current.y < Game.GRID_HEIGHT) {
+                if (game.getSnake().getBody().contains(current) && distanceToBody == 0) {
+                    distanceToBody = 1.0f / distance;
+                }
+                if (current.equals(food)) {
+                    foodInDirection = 1.0f;
+                }
+                current = new Point(current.x + dir.x, current.y + dir.y);
+                distance++;
+            }
+            distanceToWall = 1.0f / distance;
+
+            state[i++] = distanceToWall;
+            state[i++] = distanceToBody;
+            state[i++] = foodInDirection;
+        }
+
+        // Food direction relative to head
+        state[i++] = Integer.compare(food.x, head.x);
+        state[i] = Integer.compare(food.y, head.y);
+
+        return Nd4j.create(state);
     }
 
     /**
@@ -61,26 +95,20 @@ public class Agent {
      * @param state the current state
      * @return the chosen action
      */
-    public int chooseAction(String state) {
+    public int chooseAction(INDArray state) {
         if (random.nextDouble() < explorationRate) {
             return random.nextInt(4); // Explore
         } else {
-            return qTable.getBestAction(state); // Exploit
+            INDArray output = dqn.output(state);
+            return Nd4j.argMax(output, 1).getInt(0); // Exploit
         }
     }
 
     /**
-     * Updates the Q-table based on the reward.
-     * @param state the state
-     * @param action the action
-     * @param reward the reward
-     * @param nextState the next state
+     * Decays the exploration rate.
      */
-    public void learn(String state, int action, double reward, String nextState) {
-        double oldQValue = qTable.get(state)[action];
-        double nextMaxQ = qTable.get(nextState)[qTable.getBestAction(nextState)];
-        double newQValue = oldQValue + learningRate * (reward + discountFactor * nextMaxQ - oldQValue);
-        qTable.update(state, action, newQValue);
+    public void decayExplorationRate() {
+        explorationRate = Math.max(minExplorationRate, explorationRate * explorationDecayRate);
     }
 
     /**

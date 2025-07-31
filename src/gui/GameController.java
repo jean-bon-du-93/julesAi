@@ -3,6 +3,7 @@ package gui;
 import game.Direction;
 import game.Game;
 
+import javax.swing.*;
 import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
 
@@ -16,6 +17,8 @@ public class GameController {
     private final MenuPanel menuPanel;
     private Thread gameThread;
     private utils.Stats lastTrainingStats;
+    private java.util.List<Double> lastTrainingLosses;
+    private final OptionsPanel optionsPanel;
 
     /**
      * Constructs a new GameController.
@@ -23,9 +26,21 @@ public class GameController {
     public GameController() {
         gameFrame = new GameFrame();
         menuPanel = new MenuPanel(this);
+        optionsPanel = new OptionsPanel(this);
         gameFrame.switchPanel(menuPanel);
     }
 
+    public void showMenu() {
+        gameFrame.switchPanel(menuPanel);
+    }
+
+    public void showOptions() {
+        gameFrame.switchPanel(optionsPanel);
+    }
+
+    /**
+     * Starts the human player mode.
+     */
     public void startHumanMode() {
         game = new Game();
         gamePanel = new GamePanel(game);
@@ -41,16 +56,23 @@ public class GameController {
         startGameLoop();
     }
 
+    /**
+     * Starts the AI training mode.
+     */
     public void startAiTrainingMode() {
         new Thread(() -> {
             System.out.println("AI Training Mode started. This may take a while...");
             ai.Trainer trainer = new ai.Trainer();
             lastTrainingStats = trainer.startTraining();
+            lastTrainingLosses = trainer.getLossHistory();
             System.out.println("AI Training finished.");
             SwingUtilities.invokeLater(() -> JOptionPane.showMessageDialog(gameFrame, "AI Training Finished.", "Info", JOptionPane.INFORMATION_MESSAGE));
         }).start();
     }
 
+    /**
+     * Shows the training chart.
+     */
     public void showTrainingChart() {
         if (lastTrainingStats == null || lastTrainingStats.getScores().isEmpty()) {
             JOptionPane.showMessageDialog(gameFrame, "No training data available. Please run the AI training first.", "Info", JOptionPane.INFORMATION_MESSAGE);
@@ -58,12 +80,23 @@ public class GameController {
         }
         JFrame chartFrame = new JFrame("Training Stats");
         chartFrame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
-        chartFrame.add(utils.ChartGenerator.createScoreChart(lastTrainingStats.getScores()));
+
+        JTabbedPane tabbedPane = new JTabbedPane();
+        tabbedPane.addTab("Scores", utils.ChartGenerator.createScoreChart(lastTrainingStats.getScores()));
+
+        if (lastTrainingLosses != null && !lastTrainingLosses.isEmpty()) {
+            tabbedPane.addTab("Loss", utils.ChartGenerator.createLossChart(lastTrainingLosses));
+        }
+
+        chartFrame.add(tabbedPane);
         chartFrame.pack();
         chartFrame.setLocationRelativeTo(gameFrame);
         chartFrame.setVisible(true);
     }
 
+    /**
+     * Starts the AI autonomous mode.
+     */
     public void startAiAutonomousMode() {
         game = new Game();
         gamePanel = new GamePanel(game);
@@ -71,15 +104,15 @@ public class GameController {
 
         new Thread(() -> {
             try {
-                ai.QTable qTable = ai.QTable.load("saves/q_table.ser");
-                ai.Agent agent = new ai.Agent(qTable, 0, 1, 0); // No learning, no exploration
+                org.deeplearning4j.nn.multilayer.MultiLayerNetwork dqn = org.deeplearning4j.nn.multilayer.MultiLayerNetwork.load(new java.io.File("saves/dqn.zip"), true);
+                ai.Agent agent = new ai.Agent(dqn, null, 0, 0, 0, 0); // No replay memory or exploration needed for autonomous mode
 
                 while (!Thread.currentThread().isInterrupted()) {
                     if (game.isGameOver()) {
                         game.restart();
                     }
 
-                    String state = agent.getState(game);
+                    org.nd4j.linalg.api.ndarray.INDArray state = agent.getState(game);
                     int action = agent.chooseAction(state);
                     game.setDirection(ai.Agent.getDirectionFromAction(action));
                     game.update();
@@ -91,9 +124,9 @@ public class GameController {
                         Thread.currentThread().interrupt();
                     }
                 }
-            } catch (IOException | ClassNotFoundException e) {
+            } catch (IOException e) {
                 e.printStackTrace();
-                JOptionPane.showMessageDialog(gameFrame, "Could not load AI model. Please train the AI first.", "Error", JOptionPane.ERROR_MESSAGE);
+                SwingUtilities.invokeLater(() -> JOptionPane.showMessageDialog(gameFrame, "Could not load AI model. Please train the AI first.", "Error", JOptionPane.ERROR_MESSAGE));
             }
         }).start();
     }
@@ -124,7 +157,7 @@ public class GameController {
                     gamePanel.repaint();
                 }
                 try {
-                    Thread.sleep(100); // Adjust for game speed
+                    Thread.sleep(utils.Config.GAME_SPEED);
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                 }

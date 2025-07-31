@@ -20,15 +20,27 @@ public class ChartGenerator {
      * @return the chart panel
      */
     public static JPanel createScoreChart(List<Integer> scores) {
-        XYSeries series = new XYSeries("Score");
-        for (int i = 0; i < scores.size(); i++) {
-            series.add(i, scores.get(i));
+        return createChart("Score Progression", "Episode", "Score", new XYSeries("Score"), scores);
+    }
+
+    /**
+     * Creates a chart of the loss progression.
+     * @param losses the list of losses
+     * @return the chart panel
+     */
+    public static JPanel createLossChart(List<Double> losses) {
+        return createChart("Loss Progression", "Training Step", "Loss", new XYSeries("Loss"), losses);
+    }
+
+    private static <T extends Number> JPanel createChart(String title, String xLabel, String yLabel, XYSeries series, List<T> data) {
+        for (int i = 0; i < data.size(); i++) {
+            series.add(i, data.get(i));
         }
         XYSeriesCollection dataset = new XYSeriesCollection(series);
         JFreeChart chart = ChartFactory.createXYLineChart(
-                "Score Progression",
-                "Episode",
-                "Score",
+                title,
+                xLabel,
+                yLabel,
                 dataset
         );
         return new ChartPanel(chart);

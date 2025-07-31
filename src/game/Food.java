@@ -42,6 +42,10 @@ public class Food {
         } while (snake.getBody().contains(position));
     }
 
+    /**
+     * Gets the position of the food.
+     * @return the position of the food
+     */
     public Point getPosition() {
         return position;
     }
