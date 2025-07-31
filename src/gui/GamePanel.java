@@ -17,9 +17,11 @@ public class GamePanel extends JPanel {
      * Constructs a new GamePanel.
      * @param game the game instance
      */
+import utils.Config;
+
     public GamePanel(Game game) {
         this.game = game;
-        setPreferredSize(new Dimension(Game.GRID_WIDTH * CELL_SIZE, Game.GRID_HEIGHT * CELL_SIZE));
+        setPreferredSize(new Dimension(Config.GRID_WIDTH * CELL_SIZE, Config.GRID_HEIGHT * CELL_SIZE));
         setBackground(Color.BLACK);
     }
 
@@ -60,25 +62,42 @@ public class GamePanel extends JPanel {
 
     private void drawGrid(Graphics g) {
         g.setColor(Color.DARK_GRAY);
-        for (int i = 0; i <= Game.GRID_WIDTH; i++) {
-            g.drawLine(i * CELL_SIZE, 0, i * CELL_SIZE, Game.GRID_HEIGHT * CELL_SIZE);
+        for (int i = 0; i <= Config.GRID_WIDTH; i++) {
+            g.drawLine(i * CELL_SIZE, 0, i * CELL_SIZE, Config.GRID_HEIGHT * CELL_SIZE);
         }
-        for (int i = 0; i <= Game.GRID_HEIGHT; i++) {
-            g.drawLine(0, i * CELL_SIZE, Game.GRID_WIDTH * CELL_SIZE, i * CELL_SIZE);
+        for (int i = 0; i <= Config.GRID_HEIGHT; i++) {
+            g.drawLine(0, i * CELL_SIZE, Config.GRID_WIDTH * CELL_SIZE, i * CELL_SIZE);
         }
     }
 
     private void drawSnake(Graphics g) {
-        g.setColor(Color.GREEN);
-        for (Point p : game.getSnake().getBody()) {
-            g.fillRect(p.x * CELL_SIZE, p.y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+        if (utils.ResourceManager.head != null && utils.ResourceManager.body != null) {
+            java.util.List<Point> body = game.getSnake().getBody();
+            for (int i = 0; i < body.size(); i++) {
+                Point p = body.get(i);
+                if (i == 0) {
+                    g.drawImage(utils.ResourceManager.head, p.x * CELL_SIZE, p.y * CELL_SIZE, CELL_SIZE, CELL_SIZE, null);
+                } else {
+                    g.drawImage(utils.ResourceManager.body, p.x * CELL_SIZE, p.y * CELL_SIZE, CELL_SIZE, CELL_SIZE, null);
+                }
+            }
+        } else { // Fallback to geometric shapes
+            g.setColor(Color.GREEN);
+            for (Point p : game.getSnake().getBody()) {
+                g.fillRect(p.x * CELL_SIZE, p.y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+            }
         }
     }
 
     private void drawFood(Graphics g) {
-        g.setColor(Color.RED);
-        Point foodPosition = game.getFood().getPosition();
-        g.fillOval(foodPosition.x * CELL_SIZE, foodPosition.y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+        if (utils.ResourceManager.food != null) {
+            Point foodPosition = game.getFood().getPosition();
+            g.drawImage(utils.ResourceManager.food, foodPosition.x * CELL_SIZE, foodPosition.y * CELL_SIZE, CELL_SIZE, CELL_SIZE, null);
+        } else { // Fallback to geometric shapes
+            g.setColor(Color.RED);
+            Point foodPosition = game.getFood().getPosition();
+            g.fillOval(foodPosition.x * CELL_SIZE, foodPosition.y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+        }
     }
 
     public void setGame(Game game) {

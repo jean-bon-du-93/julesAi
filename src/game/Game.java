@@ -3,10 +3,10 @@ package game;
 /**
  * The main game engine.
  */
-public class Game {
-    public static final int GRID_WIDTH = 25;
-    public static final int GRID_HEIGHT = 25;
+import utils.Config;
+import utils.SoundManager;
 
+public class Game {
     private Snake snake;
     private Food food;
     private int score;
@@ -23,8 +23,8 @@ public class Game {
      * Initializes the game state.
      */
     public void initGame() {
-        snake = new Snake(new Point(GRID_WIDTH / 2, GRID_HEIGHT / 2));
-        food = new Food(GRID_WIDTH, GRID_HEIGHT);
+        snake = new Snake(new Point(Config.GRID_WIDTH / 2, Config.GRID_HEIGHT / 2));
+        food = new Food(Config.GRID_WIDTH, Config.GRID_HEIGHT);
         score = 0;
         gameOver = false;
     }
@@ -41,6 +41,7 @@ public class Game {
 
         if (snake.checkSelfCollision() || checkWallCollision()) {
             gameOver = true;
+            SoundManager.play(SoundManager.dieSound);
             return;
         }
 
@@ -48,6 +49,7 @@ public class Game {
             snake.grow();
             food.respawn(snake);
             score++;
+            SoundManager.play(SoundManager.eatSound);
         }
     }
 
@@ -60,7 +62,7 @@ public class Game {
 
     private boolean checkWallCollision() {
         Point head = snake.getHead();
-        return head.x < 0 || head.x >= GRID_WIDTH || head.y < 0 || head.y >= GRID_HEIGHT;
+        return head.x < 0 || head.x >= Config.GRID_WIDTH || head.y < 0 || head.y >= Config.GRID_HEIGHT;
     }
 
     /**

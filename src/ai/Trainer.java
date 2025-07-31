@@ -10,16 +10,22 @@ import java.io.IOException;
  * Manages the training process of the AI agent.
  */
 import org.deeplearning4j.nn.multilayer.MultiLayerNetwork;
+import org.deeplearning4j.optimize.listeners.ScoreIterationListener;
 import org.nd4j.linalg.api.ndarray.INDArray;
 import org.nd4j.linalg.factory.Nd4j;
 import java.util.List;
+import java.util.ArrayList;
+
 
 public class Trainer {
     private static final int NUM_EPISODES = 20000;
     private static final int REPLAY_MEMORY_CAPACITY = 10000;
     private static final int BATCH_SIZE = 128;
-    private static final String DQN_FILE = "saves/dqn.zip";
+    private static final String DQN_FILE = "saves/dqn_latest.zip";
+    private static final String BEST_DQN_FILE = "saves/dqn_best.zip";
     private final Stats stats = new Stats();
+    private final List<Double> lossHistory = new ArrayList<>();
+    private int bestScore = 0;
 
     /**
      * Starts the training process.
@@ -31,12 +37,19 @@ public class Trainer {
 
         MultiLayerNetwork dqn;
         try {
-            dqn = MultiLayerNetwork.load(new File(DQN_FILE), true);
-            System.out.println("Loaded existing DQN model.");
+            File bestModel = new File(BEST_DQN_FILE);
+            if (bestModel.exists()) {
+                dqn = MultiLayerNetwork.load(bestModel, true);
+                System.out.println("Loaded best DQN model.");
+            } else {
+                dqn = MultiLayerNetwork.load(new File(DQN_FILE), true);
+                System.out.println("Loaded latest DQN model.");
+            }
         } catch (IOException e) {
             dqn = DQN.createDQN();
             System.out.println("Created new DQN model.");
         }
+        dqn.setListeners(new ScoreIterationListener(1000));
 
         ReplayMemory replayMemory = new ReplayMemory(REPLAY_MEMORY_CAPACITY);
         Agent agent = new Agent(dqn, replayMemory, 0.95, 1.0, 0.01, 0.995);
@@ -70,10 +83,20 @@ public class Trainer {
                 System.out.printf("Episode: %d, Score: %d, Avg Score: %.2f%n", episode + 1, game.getScore(), stats.getAverageScore(100));
             }
 
-            if ((episode + 1) % (NUM_EPISODES / 10) == 0) {
+            if (game.getScore() > bestScore) {
+                bestScore = game.getScore();
+                try {
+                    dqn.save(new File(BEST_DQN_FILE), true);
+                    System.out.println("Saved new best model with score: " + bestScore);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+
+            if ((episode + 1) % 1000 == 0) { // Save latest model every 1000 episodes
                 try {
                     dqn.save(new File(DQN_FILE), true);
-                    System.out.println("Saved DQN model at episode " + (episode + 1));
+                    System.out.println("Saved latest DQN model at episode " + (episode + 1));
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
@@ -103,6 +126,7 @@ public class Trainer {
             qValues.putScalar(i, exp.action(), targetQ);
         }
         dqn.fit(states, qValues);
+        lossHistory.add(dqn.score());
     }
 
     private double calculateReward(Game game, INDArray state, INDArray nextState) {
@@ -113,5 +137,9 @@ public class Trainer {
             return (double) game.getScore(); // Reward for eating food
         }
         return -0.1; // Small penalty for each step
+    }
+
+    public List<Double> getLossHistory() {
+        return lossHistory;
     }
 }

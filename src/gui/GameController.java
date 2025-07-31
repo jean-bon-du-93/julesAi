@@ -16,14 +16,26 @@ public class GameController {
     private final MenuPanel menuPanel;
     private Thread gameThread;
     private utils.Stats lastTrainingStats;
+    private java.util.List<Double> lastTrainingLosses;
 
     /**
      * Constructs a new GameController.
      */
+    private final OptionsPanel optionsPanel;
+
     public GameController() {
         gameFrame = new GameFrame();
         menuPanel = new MenuPanel(this);
+        optionsPanel = new OptionsPanel(this);
         gameFrame.switchPanel(menuPanel);
+    }
+
+    public void showMenu() {
+        gameFrame.switchPanel(menuPanel);
+    }
+
+    public void showOptions() {
+        gameFrame.switchPanel(optionsPanel);
     }
 
     /**
@@ -52,6 +64,7 @@ public class GameController {
             System.out.println("AI Training Mode started. This may take a while...");
             ai.Trainer trainer = new ai.Trainer();
             lastTrainingStats = trainer.startTraining();
+            lastTrainingLosses = trainer.getLossHistory();
             System.out.println("AI Training finished.");
             SwingUtilities.invokeLater(() -> JOptionPane.showMessageDialog(gameFrame, "AI Training Finished.", "Info", JOptionPane.INFORMATION_MESSAGE));
         }).start();
@@ -67,7 +80,15 @@ public class GameController {
         }
         JFrame chartFrame = new JFrame("Training Stats");
         chartFrame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
-        chartFrame.add(utils.ChartGenerator.createScoreChart(lastTrainingStats.getScores()));
+
+        JTabbedPane tabbedPane = new JTabbedPane();
+        tabbedPane.addTab("Scores", utils.ChartGenerator.createScoreChart(lastTrainingStats.getScores()));
+
+        if (lastTrainingLosses != null && !lastTrainingLosses.isEmpty()) {
+            tabbedPane.addTab("Loss", utils.ChartGenerator.createLossChart(lastTrainingLosses));
+        }
+
+        chartFrame.add(tabbedPane);
         chartFrame.pack();
         chartFrame.setLocationRelativeTo(gameFrame);
         chartFrame.setVisible(true);
@@ -136,7 +157,7 @@ public class GameController {
                     gamePanel.repaint();
                 }
                 try {
-                    Thread.sleep(100); // Adjust for game speed
+                    Thread.sleep(utils.Config.GAME_SPEED);
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                 }
