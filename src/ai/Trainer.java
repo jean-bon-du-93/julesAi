@@ -54,7 +54,7 @@ public class Trainer {
         targetDqn = dqn.clone();
         dqn.setListeners(new ScoreIterationListener(1000));
 
-        ReplayMemory replayMemory = new ReplayMemory(REPLAY_MEMORY_CAPACITY);
+        ReplayMemory replayMemory = new ReplayMemory(REPLAY_MEMORY_CAPACITY, 0.6);
         Agent agent = new Agent(dqn, replayMemory, 0.95, 1.0, 0.01, 0.995);
         Game game = new Game();
 
@@ -115,17 +115,20 @@ public class Trainer {
     }
 
     private void train(MultiLayerNetwork dqn, ReplayMemory replayMemory, double discountFactor) {
-        List<ReplayMemory.Experience> batch = replayMemory.sample(BATCH_SIZE);
+        List<ReplayMemory.PrioritizedExperience> batch = replayMemory.sample(BATCH_SIZE);
 
-        INDArray states = Nd4j.vstack(batch.stream().map(ReplayMemory.Experience::state).toList());
-        INDArray nextStates = Nd4j.vstack(batch.stream().map(ReplayMemory.Experience::nextState).toList());
+        List<ReplayMemory.Experience> experiences = batch.stream().map(ReplayMemory.PrioritizedExperience::experience).toList();
+        INDArray states = Nd4j.vstack(experiences.stream().map(ReplayMemory.Experience::state).toList());
+        INDArray nextStates = Nd4j.vstack(experiences.stream().map(ReplayMemory.Experience::nextState).toList());
 
         INDArray qValues = dqn.output(states);
         INDArray nextQValuesFromMainDQN = dqn.output(nextStates);
         INDArray nextQValuesFromTargetDQN = targetDqn.output(nextStates);
 
+        double[] errors = new double[batch.size()];
         for (int i = 0; i < batch.size(); i++) {
-            ReplayMemory.Experience exp = batch.get(i);
+            ReplayMemory.Experience exp = experiences.get(i);
+            double oldQValue = qValues.getDouble(i, exp.action());
             double targetQ;
             if (exp.done()) {
                 targetQ = exp.reward();
@@ -133,9 +136,35 @@ public class Trainer {
                 int bestAction = Nd4j.argMax(nextQValuesFromMainDQN.getRow(i)).getInt(0);
                 targetQ = exp.reward() + discountFactor * nextQValuesFromTargetDQN.getDouble(i, bestAction);
             }
+            errors[i] = targetQ - oldQValue;
             qValues.putScalar(i, exp.action(), targetQ);
         }
-        dqn.fit(states, qValues);
+
+        for (int i = 0; i < batch.size(); i++) {
+            replayMemory.update(batch.get(i).index(), errors[i]);
+        }
+
+        // Importance-sampling weights
+        double[] weights = new double[batch.size()];
+        double maxWeight = 0.0;
+        for (int i = 0; i < batch.size(); i++) {
+            weights[i] = Math.pow((replayMemory.size() * batch.get(i).priority()) / replayMemory.totalPriority(), -ReplayMemory.beta);
+            if (weights[i] > maxWeight) {
+                maxWeight = weights[i];
+            }
+        }
+        for (int i = 0; i < batch.size(); i++) {
+            weights[i] /= maxWeight;
+            errors[i] *= weights[i]; // Apply weights to the errors
+        }
+
+        // Create a new INDArray for the weighted target Q-values
+        INDArray weightedQValues = qValues.dup();
+        for (int i = 0; i < batch.size(); i++) {
+            weightedQValues.putScalar(i, experiences.get(i).action(), qValues.getDouble(i, experiences.get(i).action()) + errors[i]);
+        }
+
+        dqn.fit(states, weightedQValues);
         lossHistory.add(dqn.score());
     }
 
